@@ -1,0 +1,7 @@
+#BlueJ class context
+comment0.target=ZipDir
+comment1.params=sourcePath\ outputStream
+comment1.target=ZipDir(java.nio.file.Path,\ java.util.zip.ZipOutputStream)
+comment2.params=file\ attributes
+comment2.target=java.nio.file.FileVisitResult\ visitFile(java.nio.file.Path,\ java.nio.file.attribute.BasicFileAttributes)
+numComments=3
