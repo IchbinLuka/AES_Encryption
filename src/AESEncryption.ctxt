@@ -1,0 +1,9 @@
+#BlueJ class context
+comment0.target=AESEncryption
+comment1.params=args
+comment1.target=void\ main(java.lang.String[])
+comment2.params=file\ key\ ciphermode\ destination
+comment2.target=void\ encryption(java.io.File,\ java.security.Key,\ int,\ java.lang.String)
+comment3.params=source\ destination
+comment3.target=void\ compress(java.lang.String,\ java.lang.String)
+numComments=4
