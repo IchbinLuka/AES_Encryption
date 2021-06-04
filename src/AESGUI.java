@@ -12,9 +12,11 @@ import java.security.Key;
 
 
 public class AESGUI extends Frame {
-    private static final int frameHeight = 200;
-    private static final int frameWidth = 350;
+    private static final int FRAME_HEIGHT = 200;
+    private static final int FRAME_WIDTH = 350;
     private static final String VERSION = "2.0 Dev";
+
+    private static final String PASSWORD_LABEL_1 = "Key";
 
     private TextField currentDir, password1, password2;
 
@@ -35,10 +37,9 @@ public class AESGUI extends Frame {
     {
         super(title);
         addWindowListener(new WindowAdapter() {
-
             public void windowClosing(WindowEvent evt) { dispose(); }
             });
-        setSize(frameWidth, frameHeight);
+        setSize(FRAME_WIDTH, FRAME_HEIGHT);
         setResizable(false);
         
         Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
@@ -53,7 +54,7 @@ public class AESGUI extends Frame {
         add(cp);
 
         passwordLabel1 = new Label();
-        passwordLabel1.setText("Key");
+        passwordLabel1.setText(PASSWORD_LABEL_1);
         passwordLabel1.setBounds(10, 15, 60, 25);
         cp.add(passwordLabel1);
 
@@ -175,7 +176,7 @@ public class AESGUI extends Frame {
             {
                 new InfoFileSelector(infoFile);
             }
-            AESEncryption.decrypt(encryptedFile, infoFile, key, path + "_decrypted.zip");
+            AESEncryption.decrypt(encryptedFile, infoFile, new String(keyBytes), path + "_decrypted.zip");
             File decryptedZip = new File(path + "_decrypted.zip");
             UnzipUtility.unzip(path + "_decrypted.zip", path + "_decrypted");
             if(!encryptedFile.delete() || !decryptedZip.delete()) 

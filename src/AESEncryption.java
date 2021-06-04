@@ -95,7 +95,7 @@ public class AESEncryption {
         }
     }
 
-    public void encrypt(File file, String key, String destination)
+    public static void encrypt(File file, String key, String destination)
     {
         SecureRandom random = new SecureRandom();
         byte[] salt = new byte[16];
@@ -122,7 +122,7 @@ public class AESEncryption {
 
     }
 
-    public void decrypt(File file, File infoFile, String key, String destination)
+    public static void decrypt(File file, File infoFile, String key, String destination)
         throws Exception
     {
         FileInputStream in = new FileInputStream(infoFile);
@@ -136,7 +136,7 @@ public class AESEncryption {
         encryption2(file, key, destination, Cipher.ENCRYPT_MODE, salt, iv);
     }
 
-    private void encryption2(   File file, String key, 
+    private static void encryption2(   File file, String key, 
                                 String destination, 
                                 int ciphermode, 
                                 byte[] salt, byte[] iv) throws Exception
@@ -155,7 +155,7 @@ public class AESEncryption {
         outFile.createNewFile();
         FileOutputStream out = new FileOutputStream(outFile);
 
-        byte[] buffer = new byte[128];
+        byte[] buffer = new byte[BUFFER_SIZE];
 
         while(in.read(buffer) != -1) 
         {
