@@ -14,6 +14,7 @@ import java.security.Key;
 public class AESGUI extends Frame {
     private static final int frameHeight = 200;
     private static final int frameWidth = 350;
+    private static final String VERSION = "2.0 Dev";
 
     private TextField currentDir, password1, password2;
 
@@ -165,24 +166,29 @@ public class AESGUI extends Frame {
             }
             keyBytes = newKey;
         }
-
-        Key key = new SecretKeySpec(keyBytes, "AES");
-        //System.out.println(password1.getText());
-
         if(!encrypt)
         {
             File encryptedFile = new File(path);
-            AESEncryption.encryption(encryptedFile, key, Cipher.DECRYPT_MODE, path + "_decrypted.zip");
+            //AESEncryption.encryption(encryptedFile, key, Cipher.DECRYPT_MODE, path + "_decrypted.zip");
+            File infoFile = new File(path.replace(".enc", ".info"));
+            if(!infoFile.exists())
+            {
+                new InfoFileSelector(infoFile);
+            }
+            AESEncryption.decrypt(encryptedFile, infoFile, key, path + "_decrypted.zip");
             File decryptedZip = new File(path + "_decrypted.zip");
             UnzipUtility.unzip(path + "_decrypted.zip", path + "_decrypted");
-            if(!encryptedFile.delete() || !decryptedZip.delete()) new ErrorMessage("Unable to clean up results!");
+            if(!encryptedFile.delete() || !decryptedZip.delete()) 
+                new ErrorMessage("Unable to clean up results!");
         }
         else
         {
             AESEncryption.compress(path, path + "_compressed.zip");
             File compressedFile = new File(path + "_compressed.zip");
 
-            AESEncryption.encryption(new File(path + "_compressed.zip"), key, Cipher.ENCRYPT_MODE, path + "_encrypted");
+            AESEncryption.encryption(new File(path + "_compressed.zip"), key, 
+                Cipher.ENCRYPT_MODE, 
+                path + ".enc");
             if(!compressedFile.delete()) new ErrorMessage("Unable to clean up results!");
         }
     }
@@ -209,6 +215,6 @@ public class AESGUI extends Frame {
         }
     }
     public static void main(String[] args) {
-        new AESGUI("AES Encryption v1.1");
+        new AESGUI("AES Encryption v" + VERSION);
     }
 }
