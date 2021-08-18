@@ -1,22 +1,34 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.swing.JCheckBox;
-import javax.swing.JFileChooser;
+import javax.swing.*;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
 import java.security.Key;
 
 
 public class AESGUI extends Frame {
-    private static final int FRAME_HEIGHT = 200;
+    private static final int FRAME_HEIGHT = 230;
     private static final int FRAME_WIDTH = 350;
-    private static final String VERSION = "2.0 Dev";
+    private static final String VERSION = "2.0 Beta";
+    private static final String FILE_CHOOSER_TITLE = "Select info-file";
 
     private static final String PASSWORD_LABEL_1 = "Key";
+
+    private static final String ENCRYPTED_FILE_ENDING = ".enc";
+
+    private static final String DEFAULT_DIRECTORY = "C:/Users/Luka/Documents/CM/AES_Encryption/Encryption_alpha_2-0";
+
+    private static final int KEY_LENGTH = 32;
+
+    private static final String ERROR_NO_INFO_FILE = "Cannot decrypt without an info-file!";
+    private static final String ERROR_LOOK_AND_FEEL_NOT_FOUND = "Not able to apply system default look and feel!";
 
     private TextField currentDir, password1, password2;
 
@@ -27,6 +39,8 @@ public class AESGUI extends Frame {
     private JCheckBox checkBoxEncrypt, checkBoxDecrypt;
 
     private JFileChooser fileChooser;
+
+    private JProgressBar progressBar;
 
     private String path;
 
@@ -40,7 +54,7 @@ public class AESGUI extends Frame {
             public void windowClosing(WindowEvent evt) { dispose(); }
             });
         setSize(FRAME_WIDTH, FRAME_HEIGHT);
-        setResizable(false);
+        setResizable(true);
         
         Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
 
@@ -48,7 +62,6 @@ public class AESGUI extends Frame {
         int y = (d.height - getSize().height) / 2;
 
         setLocation(x, y);
-        setResizable(false);
 
         Panel cp = new Panel(null);
         add(cp);
@@ -64,7 +77,6 @@ public class AESGUI extends Frame {
         password1.setEchoChar('*');
         cp.add(password1);
 
-
         passwordLabel2 = new Label();
         passwordLabel2.setText("Confirm");
         passwordLabel2.setBounds(10, 50, 60, 25);
@@ -75,7 +87,6 @@ public class AESGUI extends Frame {
         password2.setEditable(true);
         password2.setEchoChar('*');
         cp.add(password2);
-
 
         checkBoxEncrypt = new JCheckBox("Encrypt");
         checkBoxEncrypt.setBounds(getSize().width - 90, 15, 70, 25);
@@ -113,16 +124,18 @@ public class AESGUI extends Frame {
         startButton.setLabel("Start");
         startButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
+                startButton.setEnabled(false);
                 try {
                     start();
-                }
-                catch (BadPaddingException bException) {
-                    new ErrorMessage("Wrong Password/Key!");
                 }
                 catch(FileNotFoundException fException)
                 {
                     new ErrorMessage("File/Directory not found!");
                     fException.printStackTrace();
+                }
+                catch (IOException ioException)
+                {
+                    new ErrorMessage("IOException");
                 }
                 catch (Exception e) {
                     new ErrorMessage("Something went wrong! Check console for more info.");
@@ -132,9 +145,15 @@ public class AESGUI extends Frame {
         });
         cp.add(startButton);
 
+        progressBar = new JProgressBar();
+        progressBar.setBounds(startButton.getX(), startButton.getY() + 30, startButton.getWidth(), startButton.getHeight());
+        //progressBar.setVisible(false);
+        progressBar.setStringPainted(true);
+        cp.add(progressBar);
+
         currentDir = new TextField();
         currentDir.setBounds(80, 95, 250, 23);
-        currentDir.setText("No directory selected");
+        currentDir.setText("No directory/file selected");
         cp.add(currentDir);
 
         setVisible(true);
@@ -154,49 +173,58 @@ public class AESGUI extends Frame {
         }
 
         byte[] keyBytes = password1.getText().getBytes();
-        if(keyBytes.length != 16)
+        if(keyBytes.length != KEY_LENGTH)
         {
-            byte[] newKey = new byte[16];
-            if(keyBytes.length < 16)
+            byte[] newKey = new byte[KEY_LENGTH];
+            if(keyBytes.length < KEY_LENGTH)
             {
                 for(int i = 0; i < keyBytes.length; i++) newKey[i] = keyBytes[i];
             }
             else
             {
-                for(int i = 0; i < 16; i++) newKey[i] = keyBytes[i];
+                for(int i = 0; i < KEY_LENGTH; i++) newKey[i] = keyBytes[i];
             }
             keyBytes = newKey;
         }
         if(!encrypt)
         {
             File encryptedFile = new File(path);
-            //AESEncryption.encryption(encryptedFile, key, Cipher.DECRYPT_MODE, path + "_decrypted.zip");
             File infoFile = new File(path.replace(".enc", ".info"));
             if(!infoFile.exists())
             {
-                new InfoFileSelector(infoFile);
+                infoFile = selectInfoFile();
+                if (infoFile == null || !infoFile.exists()) {
+                    new ErrorMessage(ERROR_NO_INFO_FILE);
+                    return;
+                }
             }
-            AESEncryption.decrypt(encryptedFile, infoFile, new String(keyBytes), path + "_decrypted.zip");
-            File decryptedZip = new File(path + "_decrypted.zip");
-            UnzipUtility.unzip(path + "_decrypted.zip", path + "_decrypted");
-            if(!encryptedFile.delete() || !decryptedZip.delete()) 
-                new ErrorMessage("Unable to clean up results!");
+            AESEncryption task = new AESEncryption(
+                    encryptedFile,
+                    infoFile,
+                    new String(keyBytes),
+                    path + "_decrypted.zip",
+                    progressBar,
+                    startButton);
+            task.execute();
         }
         else
         {
-            AESEncryption.compress(path, path + "_compressed.zip");
-            File compressedFile = new File(path + "_compressed.zip");
-
-            AESEncryption.encryption(new File(path + "_compressed.zip"), key, 
-                Cipher.ENCRYPT_MODE, 
-                path + ".enc");
-            if(!compressedFile.delete()) new ErrorMessage("Unable to clean up results!");
+            AESEncryption task = new AESEncryption(
+                    new File(path),
+                    new String(keyBytes),
+                    path + ENCRYPTED_FILE_ENDING,
+                    progressBar,
+                    startButton);
+            task.execute();
         }
     }
 
     private void selectDirectory()
     {
         fileChooser = new JFileChooser();
+        if(DEFAULT_DIRECTORY != null)
+            fileChooser.setCurrentDirectory(new File(DEFAULT_DIRECTORY));
+
         if(encrypt)
         {
             fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -207,7 +235,6 @@ public class AESGUI extends Frame {
         {
             fileChooser.setDialogTitle("Select File");
         }
-        
 
         if(fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
         {
@@ -215,7 +242,28 @@ public class AESGUI extends Frame {
             currentDir.setText(path);
         }
     }
+
+    private File selectInfoFile()
+    {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle(FILE_CHOOSER_TITLE);
+
+        if(fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
+            return fileChooser.getSelectedFile();
+        else
+            return null;
+    }
+
     public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }
+        catch (Exception e)
+        {
+            new ErrorMessage(ERROR_LOOK_AND_FEEL_NOT_FOUND);
+            e.printStackTrace();
+        }
+
         new AESGUI("AES Encryption v" + VERSION);
     }
 }

@@ -1,110 +1,76 @@
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
+import java.awt.*;
+import java.io.*;
 import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.swing.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.zip.ZipOutputStream;
 import java.nio.file.Files;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
 
-public class AESEncryption {
+public class AESEncryption extends SwingWorker<Void, Integer> {
 
     public static final byte COMPATIBILITY_VERSION = 1;
     public static final int BUFFER_SIZE = 2048;
 
-    public static void main(String[] args) throws Exception {
-        Key key = new SecretKeySpec("aaaaaaaaaaaaaaaa".getBytes(), "AES");
-        encryption(new File("C:/Users/Luka/Documents/CM/AES/Encryption/Test.txt"), key, Cipher.ENCRYPT_MODE, "C:/Users/Luka/Documents/CM/AES/Encryption/Test2.txt");
-        encryption(new File("C:/Users/Luka/Documents/CM/AES/Encryption/Test2.txt"), key, Cipher.DECRYPT_MODE, "C:/Users/Luka/Documents/CM/AES/Encryption/Test3.txt");
-    }
+    private static final String PROGRESS_UNZIPPING = "Extracting Results";
+    private static final String PROGRESS_ZIPPING   = "Zipping Folder";
+    private static final String PROGRESS_ENCRYPTING = "Encrypting";
+    private static final String PROGRESS_DECRYPTING = "Decrypting";
+    private static final String PROGRESS_FINISHED = "Finished";
+    private static final String COMPRESSED_NAME = "_compressed.zip";
 
-    public static void encryption(File file, Key key, int ciphermode, String destination) throws  FileNotFoundException, NoSuchAlgorithmException,
-    NoSuchPaddingException, InvalidKeyException, IOException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException
+    private boolean encrypt;
+    private File file;
+    private String key;
+    private String destination;
+    private File infoFile;
+    private JProgressBar pb;
+    private Button button;
+
+    private byte[] salt, iv;
+
+    public AESEncryption(File file, String key, String destination, JProgressBar pb, Button button)
     {
-        File outFile = new File(destination);
-        outFile.createNewFile();
-
-        FileInputStream input = new FileInputStream(file);
-        BufferedInputStream bInput = new BufferedInputStream(input);
-
-        FileOutputStream output = new FileOutputStream(outFile);
-        BufferedOutputStream bOutput = new BufferedOutputStream(output);
-
-        try {
-            if(ciphermode == Cipher.ENCRYPT_MODE)
-            {
-                bOutput.write(COMPATIBILITY_VERSION);
-            }
-            else if(ciphermode == Cipher.DECRYPT_MODE)
-            {
-                byte[] versionBytes = new byte[1];
-                bInput.read(versionBytes);
-                if(versionBytes[0] != COMPATIBILITY_VERSION)
-                {
-                    new ErrorMessage("Wrong Version!");
-                }
-            }
-            
-            Cipher cipher;
-
-            SecretKeySpec sKeySpec = new SecretKeySpec(key.getEncoded(), "AES");
-
-            cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(ciphermode, sKeySpec, new IvParameterSpec(new byte[16]));
-            
-            byte[] inBytes = input.readAllBytes();
-
-            byte[] outBytes = cipher.doFinal(inBytes);
-
-            /**
-             * Buffered Encryption (not working yet)
-             * 
-             * while(bInput.available() > 0)
-            {
-                byte inBytes = (byte)bInput.read();
-                byte[] outBytes = cipher.doFinal(inBytes);
-                output.write(outBytes);
-            } **/
-            if(ciphermode == Cipher.ENCRYPT_MODE) output.write(COMPATIBILITY_VERSION);
-            output.write(outBytes);
-        } 
-        finally
-        {
-            input.close();
-            output.close();
-        }
+        encrypt = true;
+        init(file, key, destination, pb, button);
     }
 
-    public static void encrypt(File file, String key, String destination)
+    public AESEncryption(File file, File infoFile, String key, String destination, JProgressBar pb, Button button)
+    {
+        encrypt = false;
+        this.infoFile = infoFile;
+        init(file, key, destination, pb, button);
+    }
+
+    private void init(File file, String key, String destination, JProgressBar pb, Button button)
+    {
+        this.destination = destination;
+        this.file = file;
+        this.key = key;
+        this.pb = pb;
+        this.button = button;
+    }
+
+    public void encrypt()
     {
         SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[16];
-        byte[] iv   = new byte[16];
+        salt = new byte[16];
+        iv   = new byte[16];
 
         random.nextBytes(salt);
         random.nextBytes(iv);
 
-        File infoFile = new File(destination + ".info");
+        infoFile = new File(destination.replace(".enc", ".info"));
         FileOutputStream out;
         try {
             infoFile.createNewFile();
@@ -114,61 +80,74 @@ public class AESEncryption {
             out.write(iv);
 
             out.close();
-
-            encryption2(file, key, destination, Cipher.ENCRYPT_MODE, salt, iv);
         } catch (Exception e) {
             new ErrorMessage("Unable to create info file");
         }
-
     }
 
-    public static void decrypt(File file, File infoFile, String key, String destination)
+    public void decrypt()
         throws Exception
     {
         FileInputStream in = new FileInputStream(infoFile);
 
-        byte[] salt = new byte[16];
-        byte[] iv   = new byte[16];
+        salt = new byte[16];
+        iv   = new byte[16];
 
         in.read(salt);
         in.read(iv);
-
-        encryption2(file, key, destination, Cipher.ENCRYPT_MODE, salt, iv);
+        in.close();
     }
 
-    private static void encryption2(   File file, String key, 
-                                String destination, 
-                                int ciphermode, 
-                                byte[] salt, byte[] iv) throws Exception
+    private void encryption() throws Exception
     {
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         KeySpec keySpec = new PBEKeySpec(key.toCharArray(), salt, 65536, 256);
         SecretKey tmp = factory.generateSecret(keySpec);
         SecretKeySpec secretKey = new SecretKeySpec(tmp.getEncoded(), "AES");
 
+        System.out.println(byteToHex(secretKey.getEncoded()));
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(ciphermode, secretKey, new IvParameterSpec(iv));
+
+        int cipherMode;
+        if (encrypt)
+            cipherMode = Cipher.ENCRYPT_MODE;
+        else
+            cipherMode = Cipher.DECRYPT_MODE;
+
+        cipher.init(cipherMode, secretKey, new IvParameterSpec(iv));
+
+        File outFile = new File(destination);
+        if (!outFile.createNewFile())
+            new ErrorMessage("Unable to create File");
 
         FileInputStream in = new FileInputStream(file);
-        
-        File outFile = new File(destination);
-        outFile.createNewFile();
+
         FileOutputStream out = new FileOutputStream(outFile);
 
-        byte[] buffer = new byte[BUFFER_SIZE];
+        int progress = 0;
 
-        while(in.read(buffer) != -1) 
-        {
-            byte[] bytes = cipher.update(buffer);
-            out.write(bytes);
+        pb.setMaximum((int)((float)file.length() / BUFFER_SIZE));
+        pb.setIndeterminate(false);
+
+        try {
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int read;
+
+            while ((read = in.read(buffer)) != -1) {
+                byte[] bytes = cipher.update(buffer, 0, read);
+                out.write(bytes);
+                progress++;
+                publish(progress);
+            }
+            byte[] bytes = in.readAllBytes();
+            out.write(cipher.doFinal(bytes));
         }
-        byte[] bytes = in.readAllBytes();
-        out.write(cipher.doFinal(bytes));
-
-        out.close();
-        in.close();
-
-        
+        catch (BadPaddingException e) {}
+        finally {
+            out.flush();
+            out.close();
+            in.close();
+        }
     }
 
     public static void compress(String source, String destination)
@@ -186,5 +165,88 @@ public class AESEncryption {
         {
             System.err.println("An Error has occured while compressing the files: " + exception);
         }
+    }
+
+    private static String byteToHex(byte[] bytes)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        for(byte b : bytes)
+            builder.append(String.format("%02X ", b));
+
+        return builder.toString();
+    }
+
+    @Override
+    protected void process(List<Integer> chunks) {
+        int i = chunks.get(chunks.size()-1);
+        pb.setValue(i); // The last value in this array is all we care about.
+        System.out.println(i);
+    }
+
+    @Override
+    protected Void doInBackground() throws Exception {
+        if (encrypt)
+        {
+            pb.setIndeterminate(true);
+            pb.setString(PROGRESS_ZIPPING);
+            AESEncryption.compress(file.getPath(), file.getPath() + COMPRESSED_NAME);
+            file = new File(file.getPath() + COMPRESSED_NAME);
+
+            pb.setIndeterminate(false);
+            pb.setString(PROGRESS_ENCRYPTING);
+
+            encrypt();
+            encryption();
+
+            if(!file.delete()) new ErrorMessage("Unable to clean up results!");
+        }
+        else
+        {
+            pb.setIndeterminate(false);
+            pb.setString(PROGRESS_DECRYPTING);
+            File decryptedZip = new File(destination);
+            decrypt();
+            try {
+                encryption();
+
+                pb.setIndeterminate(true);
+                pb.setString(PROGRESS_UNZIPPING);
+                if (isArchive(decryptedZip)) {
+                    UnzipUtility.unzip(destination, destination.replace(".zip", ""));
+
+                    if (!file.delete() || !decryptedZip.delete() || !infoFile.delete())
+                        new ErrorMessage("Unable to clean up results!");
+                }
+                else {
+                    new ErrorMessage("Wrong Key/Password");
+                    decryptedZip.delete();
+                }
+            }
+            catch (BadPaddingException bpe)
+            {
+                new ErrorMessage("Wrong Password/Key");
+                decryptedZip.delete();
+            }
+
+            pb.setIndeterminate(false);
+        }
+        pb.setString(PROGRESS_FINISHED);
+        button.setEnabled(true);
+        return null;
+    }
+
+    private static boolean isArchive(File file)
+    {
+        int fileSignature = 0;
+        try(RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            fileSignature = raf.readInt();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+        return fileSignature == 0x504B0304 || fileSignature == 0x504B0506 || fileSignature == 0x504B0708;
     }
 }

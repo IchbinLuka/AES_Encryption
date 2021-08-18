@@ -3,6 +3,9 @@ import java.awt.event.*;
 
 public class ErrorMessage extends Frame {
 
+    private static final String ERROR_STRING = "Error: ";
+    public static final String ERROR_INVALID_PASSWORD = "Wrong Password/Key!";
+
     Label textField;
     public ErrorMessage(String exeptionString)
     {
@@ -27,7 +30,7 @@ public class ErrorMessage extends Frame {
 
         textField = new Label();
         textField.setBounds(15, 20, 280, 30);
-        textField.setText("Error: " + exeptionString);
+        textField.setText(ERROR_STRING + exeptionString);
         cp.add(textField);
 
         setVisible(true);
